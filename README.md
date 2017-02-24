@@ -15,9 +15,9 @@ Notifications for:
 
 ## Installation
 
-Make sure that Libnotify is and Python bindings are installed. Use your favorite package manager
+Make sure that Libnotify and Python bindings are installed. Use your favorite package manager
 
-Move `alibnotify.py` to `~/.weechat/python/autoload/alibnotify.py`.
+Run the provided `install.sh` script to install the plugin into the users weechat directory
 
 ## Settings
 
