@@ -31,13 +31,14 @@
 
 SCRIPT_NAME = 'alibnotify'
 SCRIPT_AUTHOR = 'NikolasOliveira'
-SCRIPT_VERSION = '1.0.0'
+SCRIPT_VERSION = '1.0.2'
 SCRIPT_LICENSE = 'MIT'
 SCRIPT_DESC = 'Sends libnotify notifications upon events.'
 
 
 # Changelog
-# 2017-02-23: Fork from anotify
+# 2017-02-23: v1.0.2 Add install script
+# 2017-02-23: v1.0.1 Fork from anotify
 # 2012-09-20: v1.0.0 Forked from original and adapted for libnotify.
 
 # -----------------------------------------------------------------------------
