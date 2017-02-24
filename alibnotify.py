@@ -1,11 +1,14 @@
 # -*- coding: utf-8 -*-
 #
-# anotify.py
-# Copyright (c) 2012 magnific0
+# alibnotify.py
+# Copyright NikolasOliveira
 #
-# based on:
-# growl.py
-# Copyright (c) 2011 Sorin Ionescu <sorin.ionescu@gmail.com>
+# Forked from
+#   anotify.py
+#   Copyright (c) 2012 magnific0
+#     based on:
+#     growl.py
+#     Copyright (c) 2011 Sorin Ionescu <sorin.ionescu@gmail.com>
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -26,14 +29,15 @@
 # SOFTWARE.
 
 
-SCRIPT_NAME = 'anotify'
-SCRIPT_AUTHOR = 'magnific0'
+SCRIPT_NAME = 'alibnotify'
+SCRIPT_AUTHOR = 'NikolasOliveira'
 SCRIPT_VERSION = '1.0.0'
 SCRIPT_LICENSE = 'MIT'
 SCRIPT_DESC = 'Sends libnotify notifications upon events.'
 
 
 # Changelog
+# 2017-02-23: Fork from anotify
 # 2012-09-20: v1.0.0 Forked from original and adapted for libnotify.
 
 # -----------------------------------------------------------------------------
@@ -71,7 +75,7 @@ except ImportError as error:
         print('This script must be run under WeeChat.')
         print('Get WeeChat at http://www.weechat.org.')
     else:
-        weechat.prnt('', 'anotify: {0}'.format(error))
+        weechat.prnt('', 'alibnotify: {0}'.format(error))
 
 # -----------------------------------------------------------------------------
 # Globals
@@ -416,7 +420,7 @@ def a_notify(notification, title, description, priority=pynotify.URGENCY_LOW):
         wn.set_timeout(time_out)
         wn.show()
     except Exception as error:
-        weechat.prnt('', 'anotify: {0}'.format(error))
+        weechat.prnt('', 'alibnotify: {0}'.format(error))
 
 
 # -----------------------------------------------------------------------------

@@ -1,8 +1,8 @@
-# WeeChat Growl Script
+# alibnotify - A WeeChat Libnotify Script
 
 This is a notification script for [WeeChat](http://weechat.org) Internet Relay Chat client.
 
-Originally developed for Growl, but adapted for Libnotify, see [weechat-growl](https://github.com/sorin-ionescu/weechat-growl).
+Forked from anofity, see [anotify](https://github.com/magnific0/weechat-anotify)
 
 ## Features
 
@@ -17,7 +17,7 @@ Notifications for:
 
 Make sure that Libnotify is and Python bindings are installed. Use your favorite package manager
 
-Move `anotify.py` to `~/.weechat/python/autoload/anotify.py`.
+Move `alibnotify.py` to `~/.weechat/python/autoload/alibnotify.py`.
 
 ## Settings
 
