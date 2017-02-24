@@ -31,12 +31,16 @@
 
 SCRIPT_NAME = 'alibnotify'
 SCRIPT_AUTHOR = 'NikolasOliveira'
-SCRIPT_VERSION = '1.0.2'
+SCRIPT_VERSION = '1.2.0'
 SCRIPT_LICENSE = 'MIT'
 SCRIPT_DESC = 'Sends libnotify notifications upon events.'
 
 
 # Changelog
+# 2017-02-24: v1.2.0 Add /alibnotify command. First arg "mute" allows the user
+#                    to disable/mute notifications (either by toggle or
+#                    providing a time for how long notifications should be
+#                    disabled)
 # 2017-02-23: v1.1.0 Add whitelist functionality. This allows users to opt in
 #                    to receiving public channel notifications but filter down
 #                    to only the channels they're interested. Filtering out
@@ -141,7 +145,8 @@ DISPATCH_TABLE = {
 
 STATE = {
     'icon': None,
-    'is_away': False
+    'is_away': False,
+    'is_muted': False
 }
 
 
@@ -423,8 +428,12 @@ def cb_process_message(
 
 
 def a_notify(notification, title, description, priority=pynotify.URGENCY_LOW):
-    '''Returns whether notifications should be sticky.'''
+    '''Assemble and show the notification'''
     is_away = STATE['is_away']
+    if STATE['is_muted']:
+        weechat.prnt('', 'alibnotify is currently muted, '
+                     'not showing notification. Unmute with: /alibnotify mute')
+        return
     icon = STATE['icon']
     time_out = 5000
     if weechat.config_get_plugin('sticky') == 'on':
@@ -439,6 +448,62 @@ def a_notify(notification, title, description, priority=pynotify.URGENCY_LOW):
         wn.show()
     except Exception as error:
         weechat.prnt('', 'alibnotify: {0}'.format(error))
+
+
+# -----------------------------------------------------------------------------
+# Commands
+# -----------------------------------------------------------------------------
+def alibnotify_cb(data, buffer, args):
+    """Callback for alibnotify command. Current ability includes toggle message
+    muting with /alibnotify mute <timer>"""
+    arg_list = args.split()
+    if 'mute' in args:
+        mute(arg_list)
+    else:
+        weechat.prnt(buffer, 'Unrecognized arg to /alibnotify!')
+        weechat.command(buffer, '/help alibnotify')
+        return weechat.WEECHAT_RC_ERROR
+
+    return weechat.WEECHAT_RC_OK
+
+
+def mute(arg_list):
+    """Depending on the args passed from the user, either toggle the mute state
+    Or set mute to True for N minutes"""
+    if len(arg_list) == 1:
+        # Just toggle the mute state
+        STATE['is_muted'] = not STATE['is_muted']
+    elif len(arg_list) == 2:
+        # A second arg, the time to remain muted, was provided
+        time_to_mute = int(arg_list[1])
+        prev_timer_hook = STATE.get('mute_timer')
+        if prev_timer_hook:
+            weechat.unhook(prev_timer_hook)
+            weechat.prnt('', 'unhooking previous mute timer, since a new mute '
+                         'time was provided')
+        STATE['is_muted'] = True
+        timer_hook = weechat.hook_timer(time_to_mute * 1000 * 60, 0, 1,
+                                        'unmute_cb', str(time_to_mute))
+        STATE['mute_timer'] = timer_hook
+
+
+def unmute_cb(data, remaing_calls):
+    """Unset the is_muted state"""
+    STATE['is_muted'] = False
+    weechat.prnt('', 'Unmuting after %sm timer' % data)
+    return weechat.WEECHAT_RC_OK
+
+
+ALIBNOTIFY_COMMAND_HELP = """
+Suspend alibnotify notifications for N minutes with:
+    /alibnotify mute <N minutes to stay muted>
+
+Toggle notification with:
+    /alibnotify mute
+
+"""
+
+ALIBNOTIFY_COMMAND_COMPLETION = 'mute'
 
 
 # -----------------------------------------------------------------------------
@@ -476,3 +541,6 @@ if __name__ == '__main__' and IMPORT_OK and weechat.register(
     ''
 ):
     main()
+    weechat.hook_command('alibnotify', ALIBNOTIFY_COMMAND_HELP,
+                         '', '', ALIBNOTIFY_COMMAND_COMPLETION,
+                         'alibnotify_cb', '')
