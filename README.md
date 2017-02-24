@@ -24,6 +24,7 @@ Run the provided `install.sh` script to install the plugin into the users weecha
 ### Notification Settings
 
 - `show_public_message`: Notify on public message. (on/off*)
+- `public_channel_whitelist`: Allow only these public channels to show notifications ("")
 - `show_private_message`: Notify on private message. (on*/off)
 - `show_public_action_message`: Notify on public action message. (on/off*)
 - `show_private_action_message`: Notify on private action message. (on*/off)
