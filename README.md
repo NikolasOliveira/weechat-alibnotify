@@ -12,6 +12,8 @@ Notifications for:
 - Inivtes, topic changes
 - Extensive DCC support: chat, file receiving and sending
 - Notifications can be made sticky (always or only on away)
+- Notifications can be muted/suspended temporarily (see /help alibnotify)
+- Noisy public channels can be filtered out, by whitelisting public channels you want to receive notifications from
 
 ## Installation
 
