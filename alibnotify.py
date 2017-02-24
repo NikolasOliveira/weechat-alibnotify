@@ -37,6 +37,12 @@ SCRIPT_DESC = 'Sends libnotify notifications upon events.'
 
 
 # Changelog
+# 2017-02-23: v1.1.0 Add whitelist functionality. This allows users to opt in
+#                    to receiving public channel notifications but filter down
+#                    to only the channels they're interested. Filtering out
+#                    noisy channels that contain bot/automated messages.
+#                    The whitelist is a string of channel short names, E.g.:
+#                       "#channelicareabout,#anotherchannelilike"
 # 2017-02-23: v1.0.2 Add install script
 # 2017-02-23: v1.0.1 Fork from anotify
 # 2012-09-20: v1.0.0 Forked from original and adapted for libnotify.
@@ -56,6 +62,7 @@ SETTINGS = {
     'show_channel_topic': 'on',
     'show_dcc': 'on',
     'show_upgrade_ended': 'on',
+    'public_channel_whitelist': "",
     'sticky': 'off',
     'sticky_away': 'on',
     'icon': '/usr/share/pixmaps/weechat.xpm',
@@ -181,7 +188,7 @@ def notify_highlighted_message(prefix, message):
             priority=pynotify.URGENCY_CRITICAL)
 
 
-def notify_public_message_or_action(prefix, message, highlighted):
+def notify_public_message_or_action(prefix, message, highlighted, buffer_short_name):
     '''Notify on public message or action.'''
     if prefix == ' *':
         regex = re.compile(r'^(\w+) (.+)$', re.UNICODE)
@@ -189,18 +196,27 @@ def notify_public_message_or_action(prefix, message, highlighted):
         if match:
             prefix = match.group(1)
             message = match.group(2)
-            notify_public_action_message(prefix, message, highlighted)
+            notify_public_action_message(prefix, message, highlighted, buffer_short_name)
     else:
         if highlighted:
             notify_highlighted_message(prefix, message)
         elif weechat.config_get_plugin("show_public_message") == "on":
-            a_notify(
-                'Public',
-                'Public Message',
-                '{0}: {1}'.format(prefix, message))
+            # filter through channel whitelist
+            white_list = weechat.config_get_plugin("public_channel_whitelist")
+            if not white_list:
+                a_notify(
+                    'Public',
+                    'Public Message in %s' % buffer_short_name,
+                    '{0}: {1}'.format(prefix, message))
+            elif buffer_short_name in white_list:
+                a_notify(
+                    'Public',
+                    'Public Message in %s' % buffer_short_name,
+                    '{0}: {1}'.format(prefix, message))
 
 
-def notify_private_message_or_action(prefix, message, highlighted):
+
+def notify_private_message_or_action(prefix, message, highlighted, buffer_short_name):
     '''Notify on private message or action.'''
     regex = re.compile(r'^CTCP_MESSAGE.+?ACTION (.+)$', re.UNICODE)
     match = regex.match(message)
@@ -213,18 +229,18 @@ def notify_private_message_or_action(prefix, message, highlighted):
             if match:
                 prefix = match.group(1)
                 message = match.group(2)
-                notify_private_action_message(prefix, message, highlighted)
+                notify_private_action_message(prefix, message, highlighted, buffer_short_name)
         else:
             if highlighted:
                 notify_highlighted_message(prefix, message)
             elif weechat.config_get_plugin("show_private_message") == "on":
                 a_notify(
                     'Private',
-                    'Private Message',
-                    '{0}: {1}'.format(prefix, message))
+                    'Private Message - %s' % prefix,
+                    message)
 
 
-def notify_public_action_message(prefix, message, highlighted):
+def notify_public_action_message(prefix, message, highlighted, buffer_short_name):
     '''Notify on public action message.'''
     if highlighted:
         notify_highlighted_message(prefix, message)
@@ -236,7 +252,7 @@ def notify_public_action_message(prefix, message, highlighted):
             priority=pynotify.URGENCY_NORMAL)
 
 
-def notify_private_action_message(prefix, message, highlighted):
+def notify_private_action_message(prefix, message, highlighted, buffer_short_name):
     '''Notify on private action message.'''
     if highlighted:
         notify_highlighted_message(prefix, message)
@@ -248,7 +264,7 @@ def notify_private_action_message(prefix, message, highlighted):
             priority=pynotify.URGENCY_NORMAL)
 
 
-def notify_notice_message(prefix, message, highlighted):
+def notify_notice_message(prefix, message, highlighted, buffer_short_name):
     '''Notify on notice message.'''
     regex = re.compile(r'^([^\s]*) [^:]*: (.+)$', re.UNICODE)
     match = regex.match(message)
@@ -264,7 +280,7 @@ def notify_notice_message(prefix, message, highlighted):
                 '{0}: {1}'.format(prefix, message))
 
 
-def notify_invite_message(prefix, message, highlighted):
+def notify_invite_message(prefix, message, highlighted, buffer_short_name):
     '''Notify on channel invitation message.'''
     if weechat.config_get_plugin("show_invite_message") == "on":
         regex = re.compile(
@@ -279,7 +295,7 @@ def notify_invite_message(prefix, message, highlighted):
                 '{0} has invited you to join {1}.'.format(nick, channel))
 
 
-def notify_channel_topic(prefix, message, highlighted):
+def notify_channel_topic(prefix, message, highlighted, buffer_short_name):
     '''Notify on channel topic change.'''
     if weechat.config_get_plugin("show_channel_topic") == "on":
         regex = re.compile(
@@ -382,14 +398,15 @@ def cb_process_message(
     is_public_message = tags.issuperset(
         TAGGED_MESSAGES['public message or action'])
     buffer_name = weechat.buffer_get_string(wbuffer, 'name')
+    buffer_short_name = weechat.buffer_get_string(wbuffer, 'short_name')
     dcc_buffer_regex = re.compile(r'^irc_dcc\.', re.UNICODE)
     dcc_buffer_match = dcc_buffer_regex.match(buffer_name)
     highlighted = False
-    if highlight == "1":
+    if int(highlight):
         highlighted = True
     # Private DCC message identifies itself as public.
     if is_public_message and dcc_buffer_match:
-        notify_private_message_or_action(prefix, message, highlighted)
+        notify_private_message_or_action(prefix, message, highlighted, buffer_short_name)
         return weechat.WEECHAT_RC_OK
     # Pass identified, untagged message to its designated function.
     for key, value in UNTAGGED_MESSAGES.items():
@@ -400,7 +417,7 @@ def cb_process_message(
     # Pass identified, tagged message to its designated function.
     for key, value in TAGGED_MESSAGES.items():
         if tags.issuperset(value):
-            functions[DISPATCH_TABLE[key]](prefix, message, highlighted)
+            functions[DISPATCH_TABLE[key]](prefix, message, highlighted, buffer_short_name)
             return weechat.WEECHAT_RC_OK
     return weechat.WEECHAT_RC_OK
 
