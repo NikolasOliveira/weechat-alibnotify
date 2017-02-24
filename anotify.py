@@ -62,7 +62,6 @@ SETTINGS = {
 # -----------------------------------------------------------------------------
 try:
     import re
-    import os
     import weechat
     import pynotify
     IMPORT_OK = True
@@ -430,20 +429,7 @@ def main():
         if not weechat.config_is_set_plugin(option):
             weechat.config_set_plugin(option, value)
     # Initialize.
-    name = "WeeChat"
     icon = "/usr/share/pixmaps/weechat.xpm"
-    notifications = [
-        'Public',
-        'Private',
-        'Action',
-        'Notice',
-        'Invite',
-        'Highlight',
-        'Server',
-        'Channel',
-        'DCC',
-        'WeeChat'
-    ]
     STATE['icon'] = icon
     # Register hooks.
     weechat.hook_signal(
