@@ -31,12 +31,16 @@
 
 SCRIPT_NAME = 'alibnotify'
 SCRIPT_AUTHOR = 'NikolasOliveira'
-SCRIPT_VERSION = '1.2.0'
+SCRIPT_VERSION = '1.3.0'
 SCRIPT_LICENSE = 'MIT'
 SCRIPT_DESC = 'Sends libnotify notifications upon events.'
 
 
 # Changelog
+# 2017-03-16: v1.3.0 Add alibnotify bar item. It shows mute state if
+#                    muted, so the user doesn't forget that their
+#                    notificaitions are muted. It will also display the minutes
+#                    remaining for a timed mute. The bar item is: alibnotify
 # 2017-02-24: v1.2.0 Add /alibnotify command. First arg "mute" allows the user
 #                    to disable/mute notifications (either by toggle or
 #                    providing a time for how long notifications should be
@@ -450,8 +454,51 @@ def a_notify(notification, title, description, priority=pynotify.URGENCY_LOW):
         weechat.prnt('', 'alibnotify: {0}'.format(error))
 
 
+def schedule_decrement(poll_time_m):
+    """Schedule the mute time to be decremented in <poll_time_m> minutes"""
+    weechat.hook_timer(poll_time_m * 1000 * 60, 0, 1, 'decrement_mute_time_cb',
+                       str(poll_time_m))
+
+
+def mute(arg_list):
+    """Depending on the args passed from the user, either toggle the mute state
+    Or set mute to True for N minutes"""
+    # Unhook any previous timers, because we are either unmuting, muting
+    # indefinitely or setting a new timer
+    prev_timer_hook = STATE.get('mute_timer')
+    if prev_timer_hook:
+        weechat.unhook(prev_timer_hook)
+        weechat.prnt('', 'unhooking previous mute timer, since this is a new '
+                     'mute')
+        # If we had a previous timer, also zero out the countdown time
+        STATE['mute_time'] = 0
+
+    if len(arg_list) == 1:
+        # Just toggle the mute state
+        STATE['is_muted'] = not STATE['is_muted']
+    elif len(arg_list) == 2:
+        # A second arg, the time to remain muted, was provided
+        time_to_mute = int(arg_list[1])
+
+        STATE['is_muted'] = True
+
+        # Store the mute time to be displayed in the status bar item, also
+        # decrement it periodically so the bar item displays a countdown until
+        # notifications will be unmuted
+        STATE['mute_time'] = time_to_mute
+        schedule_decrement(1)
+
+        # Schedule alibnotify to be unmuted after we've hit the requested time
+        timer_hook = weechat.hook_timer(time_to_mute * 1000 * 60, 0, 1,
+                                        'unmute_cb', str(time_to_mute))
+        STATE['mute_timer'] = timer_hook
+
+    # update bar item to show the current mute state
+    weechat.bar_item_update(SCRIPT_NAME)
+
+
 # -----------------------------------------------------------------------------
-# Commands
+# Callbacks
 # -----------------------------------------------------------------------------
 def alibnotify_cb(data, buffer, args):
     """Callback for alibnotify command. Current ability includes toggle message
@@ -467,30 +514,43 @@ def alibnotify_cb(data, buffer, args):
     return weechat.WEECHAT_RC_OK
 
 
-def mute(arg_list):
-    """Depending on the args passed from the user, either toggle the mute state
-    Or set mute to True for N minutes"""
-    if len(arg_list) == 1:
-        # Just toggle the mute state
-        STATE['is_muted'] = not STATE['is_muted']
-    elif len(arg_list) == 2:
-        # A second arg, the time to remain muted, was provided
-        time_to_mute = int(arg_list[1])
-        prev_timer_hook = STATE.get('mute_timer')
-        if prev_timer_hook:
-            weechat.unhook(prev_timer_hook)
-            weechat.prnt('', 'unhooking previous mute timer, since a new mute '
-                         'time was provided')
-        STATE['is_muted'] = True
-        timer_hook = weechat.hook_timer(time_to_mute * 1000 * 60, 0, 1,
-                                        'unmute_cb', str(time_to_mute))
-        STATE['mute_timer'] = timer_hook
+def bar_item_build_cb(data, item, window):
+    """Update the alibnotify bar item to reflect current state"""
+    if STATE['is_muted']:
+        bar_text = 'notifications: muted'
+        if 'mute_time' in STATE and STATE['mute_time'] > 0:
+            bar_text += ' (%dm)' % STATE['mute_time']
+        # Colour the text red
+        bar_text = weechat.string_eval_expression('${color:red}%s' % bar_text,
+                                                  {}, {}, {})
+        return bar_text
+    else:
+        return ''
+
+
+def decrement_mute_time_cb(data, remaing_calls):
+    """Reduce mute time state, to create a countdown of sorts. This state is
+    displayed in the alibnotify bar item"""
+    STATE['mute_time'] = STATE['mute_time'] - int(data)
+
+    # update bar item to show the current mute state
+    weechat.bar_item_update(SCRIPT_NAME)
+
+    # Check if we should schedule another decrements
+    if STATE['mute_time'] > 0:
+        schedule_decrement(int(data))
+
+    return weechat.WEECHAT_RC_OK
 
 
 def unmute_cb(data, remaing_calls):
     """Unset the is_muted state"""
     STATE['is_muted'] = False
     weechat.prnt('', 'Unmuting after %sm timer' % data)
+
+    # update bar item to show that we're unmuted
+    weechat.bar_item_update(SCRIPT_NAME)
+
     return weechat.WEECHAT_RC_OK
 
 
@@ -529,6 +589,14 @@ def main():
         '')
     weechat.hook_signal('upgrade_ended', 'cb_upgrade_ended', '')
     weechat.hook_print('', '', '', 1, 'cb_process_message', '')
+    weechat.hook_command('alibnotify', ALIBNOTIFY_COMMAND_HELP,
+                         '', '', ALIBNOTIFY_COMMAND_COMPLETION,
+                         'alibnotify_cb', '')
+    # Create bar item
+    alibnotify_bar_item = weechat.bar_item_new(SCRIPT_NAME,
+                                               'bar_item_build_cb', '')
+    weechat.prnt('', 'alibnotify bar item: %s' % alibnotify_bar_item)
+    STATE['bar_item'] = alibnotify_bar_item
 
 
 if __name__ == '__main__' and IMPORT_OK and weechat.register(
@@ -541,6 +609,3 @@ if __name__ == '__main__' and IMPORT_OK and weechat.register(
     ''
 ):
     main()
-    weechat.hook_command('alibnotify', ALIBNOTIFY_COMMAND_HELP,
-                         '', '', ALIBNOTIFY_COMMAND_COMPLETION,
-                         'alibnotify_cb', '')
